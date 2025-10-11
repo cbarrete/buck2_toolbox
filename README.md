@@ -2,6 +2,33 @@
 
 Small tools to improve your [Buck2](https://buck2.build/) experience.
 
+## How to use
+
+The currently recommended way to use the tools from this repo is to vendor them in your own.
+
+1. I do not provide stability guarantees (at least yet).
+2. You might want to make changes to the tools, and I do not intend to cover all possible edge cases.
+
+With that being said, you _can_ also consume this repo as an [external cell](https://buck2.build/docs/users/advanced/external_cells/). To do so, add the following to your [`.buckconfig`](https://buck2.build/docs/concepts/buckconfig/):
+
+```ini
+[cells]
+toolbox = toolbox
+
+[external_cells]
+toolbox = git
+
+[external_cell_toolbox]
+git_origin = https://github.com/cbarrete/buck2_toolbox
+commit_hash = <replace with a valid hash>
+```
+
+You can now e.g.
+
+```sh
+buck2 bxl toolbox//launch_json.bxl:gen -- --help
+```
+
 ## Tools
 
 ### `launch_json.bxl`
