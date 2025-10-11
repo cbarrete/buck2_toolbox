@@ -1,0 +1,50 @@
+def _impl(ctx: bxl.Context):
+    actions = ctx.bxl_actions().actions
+
+    configurations = []
+    for label, build_result in ctx.build(ctx.cli_args.targets).items():
+        artifacts = build_result.artifacts()
+        if len(artifacts) == 0:
+            continue
+        artifact = artifacts[0]
+
+        configurations.append({
+            "args": ctx.cli_args.args,
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "name": "Debug {}".format(label),
+            "program": artifact,
+            "request": "launch",
+            "type": ctx.cli_args.type,
+        })
+
+    launch_json = actions.declare_output("launch.json")
+    actions.write_json(
+        launch_json.as_output(),
+        {
+            "configurations": configurations,
+            "version": "0.2.0",
+        },
+        absolute = True,
+        pretty = True,
+    )
+    ctx.output.print(ctx.output.ensure(launch_json))
+
+gen = bxl_main(
+    impl = _impl,
+    doc = "Generates a `launch.json` file with debug configurations, which is consumed by DAP clients. The path to the file is printed to `stdout`.",
+    cli_args = {
+        "args": cli_args.list(
+            cli_args.string(),
+            doc = "Command line arguments passed to the debugee",
+            default = [],
+        ),
+        "targets": cli_args.configured_target_expr(
+            doc = "Target expression to generate debug configurations for (e.g. `//foo/...`)",
+        ),
+        "type": cli_args.string(
+            default = "lldb",
+            doc = "Type of debug adapter used. Should match your editor's DAP configuration. Defaults to `lldb`.",
+        ),
+    },
+)
