@@ -38,13 +38,13 @@ This [BXL](https://buck2.build/docs/bxl/) script generates `launch.json` files w
 Basic usage:
 
 ```sh
-cp $(buck2 bxl launch_json.bxl:gen -- --targets //path/to:target) .vscode/launch.json
+cp $(buck2 bxl toolbox//launch_json.bxl:gen -- --targets //path/to:target) .vscode/launch.json
 ```
 
 For more information about available flags:
 
 ```sh
-buck2 bxl launch_json.bxl:gen -- --help
+buck2 bxl toolbox//launch_json.bxl:gen -- --help
 ```
 
 DAP clients/editors are configured differently. For Neovim, all you need is:
