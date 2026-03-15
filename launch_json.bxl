@@ -40,6 +40,7 @@ gen = bxl_main(
             default = [],
         ),
         "targets": cli_args.configured_target_expr(
+            short = "t",
             doc = "Target expression to generate debug configurations for (e.g. `//foo/...`)",
         ),
         "type": cli_args.string(
