@@ -28,7 +28,7 @@ def _impl(ctx: bxl.Context):
         absolute = True,
         pretty = True,
     )
-    ctx.output.print(ctx.output.ensure(launch_json))
+    ctx.output.print(ctx.output.ensure(launch_json).abs_path())
 
 gen = bxl_main(
     impl = _impl,
