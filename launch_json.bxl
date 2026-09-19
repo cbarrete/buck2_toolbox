@@ -1,47 +1,80 @@
 def _impl(ctx: bxl.Context):
-    actions = ctx.bxl_actions().actions
+    post_process = ctx.unconfigured_sub_targets("//:post_process_launch_json")
+    bxl_actions = ctx.bxl_actions(exec_deps = [post_process])
+    actions = bxl_actions.actions
 
     configurations = []
-    for label, build_result in ctx.build(ctx.cli_args.targets).items():
-        artifacts = build_result.artifacts()
-        if len(artifacts) == 0:
-            continue
-        artifact = artifacts[0]
+    for label in ctx.cli_args.targets:
+        configured_target = ctx.configured_targets(label.raw_target())
+        if label.sub_target:
+            configured_target = configured_target.label.with_sub_target(label.sub_target)
+        providers = ctx.analysis(configured_target).providers()
 
-        configurations.append({
-            "args": ctx.cli_args.args,
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "name": "Debug {}".format(label),
-            "program": artifact,
-            "request": "launch",
-            "type": ctx.cli_args.type,
-        })
+        # TODO: Handle `RunInfo` first.
+        test_info = providers.get(ExternalRunnerTestInfo)
+        default_info = providers[DefaultInfo]
+        if test_info != None:
+            program = test_info.command[0]
+            args = test_info.command[1:]
+        elif providers[DefaultInfo].default_outputs:
+            program = providers[DefaultInfo].default_outputs[0]
+            args = ctx.cli_args.args
+        else:
+            fail("{} has no `ExternalRunnerTestInfo` or default output on its `DefaultInfo`.".format(label))
 
-    launch_json = actions.declare_output("launch.json")
+        configurations.append(
+            {
+                "args": args,
+                "console": "integratedTerminal",
+                "cwd": "${workspaceFolder}",
+                "name": "Debug {}".format(label),
+                "program": program,
+                "request": "launch",
+                "type": ctx.cli_args.type,
+            },
+        )
+
+    raw_launch_json = actions.declare_output("raw_launch.json")
     actions.write_json(
-        launch_json.as_output(),
+        raw_launch_json.as_output(),
         {
             "configurations": configurations,
             "version": "0.2.0",
         },
+        with_inputs = True,
         absolute = True,
         pretty = True,
+    )
+
+    launch_json = actions.declare_output("launch.json")
+    actions.run(
+        [
+            bxl_actions.exec_deps[post_process][RunInfo],
+            raw_launch_json,
+            launch_json.as_output(),
+        ],
+        category = "post_process_launch_json",
     )
     ctx.output.print(ctx.output.ensure(launch_json).abs_path())
 
 gen = bxl_main(
     impl = _impl,
-    doc = "Generates a `launch.json` file with debug configurations, which is consumed by DAP clients. The path to the file is printed to `stdout`.",
+    doc = """
+    Generates a `launch.json` file with debug configurations, which is consumed by DAP clients. The path to the file is printed to `stdout`.
+
+    Tries to get the command to run from the following providers, in order:
+    1. `ExternalRunnerTestInfo`
+    2. `DefaultInfo` (in which case you can also pass `--args`)
+    """,
     cli_args = {
         "args": cli_args.list(
             cli_args.string(),
-            doc = "Command line arguments passed to the debugee",
+            doc = "Command line arguments passed to the debugee. Only used if the target has no `RunInfo` or `ExternalTestInfo`.",
             default = [],
         ),
-        "targets": cli_args.configured_target_expr(
+        "targets": cli_args.sub_target_expr(
             short = "t",
-            doc = "Target expression to generate debug configurations for (e.g. `//foo/...`)",
+            doc = "Target expression to generate debug configurations for (e.g. `//foo/...`). Supports sub targets.",
         ),
         "type": cli_args.string(
             default = "lldb",

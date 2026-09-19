@@ -56,3 +56,6 @@ require('dap').adapters.lldb = {
     command = vim.trim(vim.system({'which', 'lldb-dap'}):wait().stdout),
 }
 ```
+
+The script will derive the command line to run from the `ExternalRunnerTestInfo` if available, otherwise from the `DefaultInfo`'s default output.
+If none of those are available, the script will fail.
