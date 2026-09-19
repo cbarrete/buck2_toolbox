@@ -13,12 +13,15 @@ def _impl(ctx: bxl.Context):
         # TODO: Handle `RunInfo` first.
         test_info = providers.get(ExternalRunnerTestInfo)
         default_info = providers[DefaultInfo]
+        hidden_inputs = []
         if test_info != None:
             program = test_info.command[0]
             args = test_info.command[1:]
+            hidden_inputs += test_info.command
         elif providers[DefaultInfo].default_outputs:
             program = providers[DefaultInfo].default_outputs[0]
             args = ctx.cli_args.args
+            hidden_inputs.append(program)
         else:
             fail("{} has no `ExternalRunnerTestInfo` or default output on its `DefaultInfo`.".format(label))
 
@@ -48,11 +51,14 @@ def _impl(ctx: bxl.Context):
 
     launch_json = actions.declare_output("launch.json")
     actions.run(
-        [
-            bxl_actions.exec_deps[post_process][RunInfo],
-            raw_launch_json,
-            launch_json.as_output(),
-        ],
+        cmd_args(
+            [
+                bxl_actions.exec_deps[post_process][RunInfo],
+                raw_launch_json,
+                launch_json.as_output(),
+            ],
+            hidden = hidden_inputs,
+        ),
         category = "post_process_launch_json",
     )
     ctx.output.print(ctx.output.ensure(launch_json).abs_path())
