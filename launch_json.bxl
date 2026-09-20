@@ -5,37 +5,60 @@ def _impl(ctx: bxl.Context):
 
     configurations = []
     for label in ctx.cli_args.targets:
+        def add_configuration(program = None, args = None, argv = None):
+            uses_split_argv = program != None and args != None
+            uses_single_argv = argv != None
+
+            if uses_split_argv and uses_single_argv:
+                fail("Cannot pass both `program`/`args` and `argv`.")
+
+            if uses_split_argv:
+                configurations.append(
+                    {
+                        "args": args,
+                        "console": "integratedTerminal",
+                        "cwd": "${workspaceFolder}",
+                        "name": "Debug {}".format(label),
+                        "program": program,
+                        "request": "launch",
+                        "type": ctx.cli_args.type,
+                    },
+                )
+            elif uses_single_argv:
+                configurations.append(
+                    {
+                        "argv": argv,
+                        "console": "integratedTerminal",
+                        "cwd": "${workspaceFolder}",
+                        "name": "Debug {}".format(label),
+                        "request": "launch",
+                        "type": ctx.cli_args.type,
+                    },
+                )
+            else:
+                fail("Must pass `program`/`args` or `argv.")
+
         configured_target = ctx.configured_targets(label.raw_target())
         if label.sub_target:
             configured_target = configured_target.label.with_sub_target(label.sub_target)
         providers = ctx.analysis(configured_target).providers()
 
-        # TODO: Handle `RunInfo` first.
+        run_info = providers.get(RunInfo)
         test_info = providers.get(ExternalRunnerTestInfo)
         default_info = providers[DefaultInfo]
         hidden_inputs = []
-        if test_info != None:
-            program = test_info.command[0]
-            args = test_info.command[1:]
+        if run_info != None:
+            add_configuration(argv = run_info.args)
+            hidden_inputs.append(run_info.args)
+        elif test_info != None:
+            add_configuration(program = test_info.command[0], args = test_info.command[1:])
             hidden_inputs += test_info.command
         elif providers[DefaultInfo].default_outputs:
             program = providers[DefaultInfo].default_outputs[0]
-            args = ctx.cli_args.args
+            add_configuration(program = program, args = ctx.cli_args.args)
             hidden_inputs.append(program)
         else:
-            fail("{} has no `ExternalRunnerTestInfo` or default output on its `DefaultInfo`.".format(label))
-
-        configurations.append(
-            {
-                "args": args,
-                "console": "integratedTerminal",
-                "cwd": "${workspaceFolder}",
-                "name": "Debug {}".format(label),
-                "program": program,
-                "request": "launch",
-                "type": ctx.cli_args.type,
-            },
-        )
+            fail("{} has no `RunInfo`, `ExternalRunnerTestInfo` or default output on its `DefaultInfo`.".format(label))
 
     raw_launch_json = actions.declare_output("raw_launch.json")
     actions.write_json(
@@ -69,8 +92,9 @@ gen = bxl_main(
     Generates a `launch.json` file with debug configurations, which is consumed by DAP clients. The path to the file is printed to `stdout`.
 
     Tries to get the command to run from the following providers, in order:
-    1. `ExternalRunnerTestInfo`
-    2. `DefaultInfo` (in which case you can also pass `--args`)
+    1. `RunInfo`
+    2. `ExternalRunnerTestInfo`
+    3. `DefaultInfo` (in which case you can also pass `--args`)
     """,
     cli_args = {
         "args": cli_args.list(

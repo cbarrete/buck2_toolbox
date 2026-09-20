@@ -57,5 +57,11 @@ require('dap').adapters.lldb = {
 }
 ```
 
-The script will derive the command line to run from the `ExternalRunnerTestInfo` if available, otherwise from the `DefaultInfo`'s default output.
+The script will derive the command line to run from the `RunInfo` or `ExternalRunnerTestInfo` if available, otherwise from the `DefaultInfo`'s default output.
 If none of those are available, the script will fail.
+
+The rationale for picking `RunInfo` over `ExternalRunnerTestInfo` when both are available is that it is more likely that the run command will run most of the logic, whereas the test command will run some checks on the output.
+In that case, users will most often want to run the former under a debugger.
+
+If this heuristic fails you, I recommend exposing more subtargets in your rules, letting you pick specifically what you want to build, run or test.
+We could also add flags to the script to force debugging a particular provider.
